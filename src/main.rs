@@ -1,12 +1,14 @@
 mod app;
 mod config;
+mod db;
 mod features;
+mod state;
 
 use dotenvy::dotenv;
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{app::build_app, config::Config};
+use crate::{app::build_app, config::Config, db::connect_db, state::AppState};
 
 #[tokio::main]
 async fn main() {
@@ -14,8 +16,10 @@ async fn main() {
     init_tracing();
 
     let config = Config::from_env();
+    let db = connect_db(&config.database_url).await;
+    let state = AppState::new(db);
     let addr = config.socket_addr();
-    let app = build_app();
+    let app = build_app(state);
 
     let listener = TcpListener::bind(addr)
         .await

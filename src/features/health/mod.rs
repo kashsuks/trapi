@@ -2,6 +2,8 @@ mod routes;
 
 use axum::Router;
 
-pub fn router() -> Router {
+use crate::state::SharedState;
+
+pub fn router() -> Router<SharedState> {
     routes::router()
 }
