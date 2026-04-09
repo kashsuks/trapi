@@ -1,5 +1,5 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordVerifier, SaltString},
     Argon2,
     PasswordHasher,
 };
@@ -10,6 +10,8 @@ use axum::{
     Json,
     Router,
 };
+use chrono::{Duration, Utc};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -23,6 +25,12 @@ struct RegisterRequest {
     password: String,
 }
 
+#[derive(Deserialize)]
+struct LoginRequest {
+    email: String,
+    password: String,
+}
+
 #[derive(Serialize, FromRow)]
 struct User {
     id: Uuid,
@@ -30,8 +38,27 @@ struct User {
     username: String,
 }
 
+#[derive(FromRow)]
+struct UserCredentials {
+    id: Uuid,
+    password_hash: String,
+}
+
+#[derive(Serialize)]
+struct LoginResponse {
+    token: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Claims {
+    sub: Uuid,
+    exp: usize,
+}
+
 pub fn router() -> Router<SharedState> {
-    Router::<SharedState>::new().route("/auth/register", post(register))
+    Router::<SharedState>::new()
+        .route("/auth/register", post(register))
+        .route("/auth/login", post(login))
 }
 
 async fn register(
@@ -74,10 +101,67 @@ async fn register(
     }
 }
 
+async fn login(
+    State(state): State<SharedState>,
+    Json(payload): Json<LoginRequest>,
+) -> Result<Json<LoginResponse>, StatusCode> {
+    if payload.email.trim().is_empty() || payload.password.trim().is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let user = sqlx::query_as::<_, UserCredentials>(
+        r#"
+        SELECT id, password_hash
+        FROM users
+        WHERE email = $1
+        "#,
+    )
+    .bind(payload.email.trim())
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|error| {
+        tracing::error!("failed to fetch login user: {error}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    verify_password(&payload.password, &user.password_hash)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let token = create_token(user.id, &state.jwt_secret)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(LoginResponse { token }))
+}
+
 fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
     let salt = SaltString::generate(&mut OsRng);
 
     Argon2::default()
         .hash_password(password.as_bytes(), &salt)
         .map(|hash| hash.to_string())
+}
+
+fn verify_password(
+    password: &str,
+    password_hash: &str,
+) -> Result<(), argon2::password_hash::Error> {
+    let parsed_hash = PasswordHash::new(password_hash)?;
+
+    Argon2::default().verify_password(password.as_bytes(), &parsed_hash)
+}
+
+fn create_token(user_id: Uuid, jwt_secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    let expiration = Utc::now() + Duration::hours(24);
+
+    let claims = Claims {
+        sub: user_id,
+        exp: expiration.timestamp() as usize,
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
+    )
 }

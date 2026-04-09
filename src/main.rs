@@ -17,7 +17,7 @@ async fn main() {
 
     let config = Config::from_env();
     let db = connect_db(&config.database_url).await;
-    let state = AppState::new(db);
+    let state = AppState::new(db, config.jwt_secret.clone());
     let addr = config.socket_addr();
     let app = build_app(state);
 
