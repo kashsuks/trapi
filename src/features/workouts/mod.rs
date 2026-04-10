@@ -1,4 +1,3 @@
-pub(crate) mod extractor;
 mod routes;
 
 use axum::Router;
