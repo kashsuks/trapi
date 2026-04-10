@@ -6,7 +6,7 @@ use argon2::{
 use axum::{
     extract::State,
     http::StatusCode,
-    routing::post,
+    routing::{get, post},
     Json,
     Router,
 };
@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-use crate::state::SharedState;
+use crate::{
+    features::auth::extractor::AuthUser,
+    state::SharedState,
+};
 
 #[derive(Deserialize)]
 struct RegisterRequest {
@@ -44,6 +47,14 @@ struct UserCredentials {
     password_hash: String,
 }
 
+#[derive(Serialize, FromRow)]
+struct MeReponse {
+    id: Uuid,
+    email: String,
+    username: String,
+    total_workout_count: i64,
+}
+
 #[derive(Serialize)]
 struct LoginResponse {
     token: String,
@@ -59,6 +70,7 @@ pub fn router() -> Router<SharedState> {
     Router::<SharedState>::new()
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
+        .route("/auth/me", get(me))
 }
 
 async fn register(
@@ -132,6 +144,35 @@ async fn login(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(LoginResponse { token }))
+}
+
+async fn me(
+    State(state): State<SharedState>,
+    auth_user: AuthUser,
+) -> Result<Json<MeReponse>, StatusCode> {
+    let user = sqlx::query_as::<_, MeReponse>(
+        r#"
+        SELECT
+            u.id,
+            u.email,
+            u.username,
+            COUNT(w.id)::BIGINT AS total_workout_count
+        FROM users u
+        LEFT JOIN workouts w ON w.user_id = u.id
+        WHERE u.id = $1
+        GROUP BY u.id, u.email, u.username
+        "#,
+    )
+    .bind(auth_user.user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|error| {
+        tracing::error!("failed to fetch current user: {error}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(Json(user))
 }
 
 fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
