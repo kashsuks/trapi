@@ -16,6 +16,8 @@ The script applies every SQL file in [`migrations/`](/Users/ksukshavasi/trapi/mi
 
 This repo is configured to run on Vercel as a Rust Function entrypoint at [`api/index.rs`](/Users/ksukshavasi/trapi/api/index.rs:1).
 
+The main site root serves interactive API docs, and the raw OpenAPI document is available at `/openapi.json`.
+
 Required environment variables:
 
 - `DATABASE_URL`

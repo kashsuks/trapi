@@ -2,12 +2,13 @@ use axum::Router;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::{
-    features::{auth, health, workouts},
+    features::{auth, docs, health, workouts},
     state::SharedState,
 };
 
 pub fn build_app(state: SharedState) -> Router {
     let app = Router::<SharedState>::new()
+        .merge(docs::router())
         .merge(auth::router())
         .merge(health::router())
         .merge(workouts::router())
