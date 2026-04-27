@@ -11,3 +11,25 @@ scripts/bootstrap_db.sh "postgres://user:pass@host:5432/dbname"
 ```
 
 The script applies every SQL file in [`migrations/`](/Users/ksukshavasi/trapi/migrations) in filename order using `psql`.
+
+## Deploy to Vercel
+
+This repo is configured to run on Vercel as a Rust Function entrypoint at [`api/index.rs`](/Users/ksukshavasi/trapi/api/index.rs:1).
+
+Required environment variables:
+
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `RUST_LOG` optional
+
+Recommended deployment flow:
+
+```bash
+vercel
+```
+
+Before the first production deploy, bootstrap the target Postgres database with:
+
+```bash
+scripts/bootstrap_db.sh "$DATABASE_URL"
+```

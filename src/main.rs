@@ -1,14 +1,8 @@
-mod app;
-mod config;
-mod db;
-mod features;
-mod state;
-
 use dotenvy::dotenv;
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{app::build_app, config::Config, db::connect_db, state::AppState};
+use trapi::{app::build_app, config::Config, db::connect_db, state::AppState};
 
 #[tokio::main]
 async fn main() {
