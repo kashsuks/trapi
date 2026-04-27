@@ -35,3 +35,7 @@ Before the first production deploy, bootstrap the target Postgres database with:
 ```bash
 scripts/bootstrap_db.sh "$DATABASE_URL"
 ```
+
+## AI Usage
+
+GPT Codex was used in this project to deploy to vercel and debug rust issues with the creation of the API
