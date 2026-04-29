@@ -38,4 +38,4 @@ scripts/bootstrap_db.sh "$DATABASE_URL"
 
 ## AI Usage
 
-GPT Codex was used in this project to deploy to vercel and debug rust issues with the creation of the API
+GPT Codex was used in this project to deploy to vercel and debug rust issues with the creation of the API. I also used it to write the Docs for the API (by using Swagger API)
